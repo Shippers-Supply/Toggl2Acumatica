@@ -75,8 +75,8 @@
 
             // Validate header structure
             const header = unquoted[0];
-            const expectedColumns = ['Project', 'Tags', 'Member', 'Email', 'Start date', 'Stop date', 'Start time', 'End time'];
-            const expectedColumnsNoEmail = ['Project', 'Tags', 'Member', 'Start date', 'Stop date', 'Start time', 'End time'];
+            const expectedColumns = ['Project', 'Tags', 'Member', 'Email', 'Start date', 'Stop date', 'Start time', 'Stop time'];
+            const expectedColumnsNoEmail = ['Project', 'Tags', 'Member', 'Start date', 'Stop date', 'Start time', 'Stop time'];
             
             const hasEmail = header.length === 8;
             const noEmail = header.length === 7;
