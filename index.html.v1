@@ -56,7 +56,7 @@
             reader.onload = (e) => {
                 try {
                     const transformed = transformCSV(e.target.result);
-                    downloadCSV(transformed, file.name.replace('.csv', '_acumatica.csv'));
+                    downloadCSV(transformed, file.name.replace('TogglTrack', 'ACUMATICA_TogglTrack'));
                     showStatus('✓ File converted and downloaded', 'success');
                 } catch (error) {
                     showStatus('Error: ' + error.message, 'error');
@@ -73,40 +73,9 @@
                 line.split(',').map(cell => cell.replace(/^"|"$/g, ''))
             );
 
-            // Validate header structure
-            const header = unquoted[0];
-            const expectedColumns = ['Project', 'Tags', 'Member', 'Email', 'Start date', 'Stop date', 'Start time', 'End time'];
-            const expectedColumnsNoEmail = ['Project', 'Tags', 'Member', 'Start date', 'Stop date', 'Start time', 'End time'];
-            
-            const hasEmail = header.length === 8;
-            const noEmail = header.length === 7;
-            
-            // Validate column structure
-            if (hasEmail) {
-                for (let i = 0; i < expectedColumns.length; i++) {
-                    if (header[i] !== expectedColumns[i]) {
-                        throw new Error(`Invalid CSV structure. Expected column ${i + 1} to be "${expectedColumns[i]}" but found "${header[i]}"`);
-                    }
-                }
-            } else if (noEmail) {
-                for (let i = 0; i < expectedColumnsNoEmail.length; i++) {
-                    if (header[i] !== expectedColumnsNoEmail[i]) {
-                        throw new Error(`Invalid CSV structure. Expected column ${i + 1} to be "${expectedColumnsNoEmail[i]}" but found "${header[i]}"`);
-                    }
-                }
-            } else {
-                throw new Error(`Invalid CSV structure. Expected 7 or 8 columns, found ${header.length}`);
-            }
-
-            // Process data rows
+            // Skip header, process data rows
             const rows = unquoted.slice(1).map(row => {
-                let project, tags, member, startDate, stopDate, startTime, stopTime;
-                
-                if (hasEmail) {
-                    [project, tags, member, , startDate, stopDate, startTime, stopTime] = row;
-                } else {
-                    [project, tags, member, startDate, stopDate, startTime, stopTime] = row;
-                }
+                const [project, tags, member, email, startDate, stopDate, startTime, stopTime] = row;
                 
                 // Transform date: YYYY-MM-DD → MM/DD/YYYY
                 const [year, month, day] = startDate.split('-');
@@ -122,9 +91,9 @@
                 return [project, operationID, member, newDate, newStartTime, newEndTime];
             });
 
-            // Build output with correct column order
+            // Build output with new headers
             const output = [
-                ['Production Nbr.', 'Operation ID', 'Employee ID', 'Start date', 'Start time', 'End time'],
+                ['Production Nbr.', 'Operation ID', 'Employee ID', 'Start date', 'Start Time', 'End Time'],
                 ...rows
             ];
 
