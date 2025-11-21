@@ -99,28 +99,33 @@
             }
 
             // Process data rows
-            const rows = unquoted.slice(1).map(row => {
-                let project, tags, member, startDate, stopDate, startTime, stopTime;
-                
-                if (hasEmail) {
-                    [project, tags, member, , startDate, stopDate, startTime, stopTime] = row;
-                } else {
-                    [project, tags, member, startDate, stopDate, startTime, stopTime] = row;
-                }
-                
-                // Transform date: YYYY-MM-DD → MM/DD/YYYY
-                const [year, month, day] = startDate.split('-');
-                const newDate = `${month}/${day}/${year}`;
-                
-                // Transform times: 24h HH:MM:SS → 12h H:MM AM/PM
-                const newStartTime = to12Hour(startTime);
-                const newEndTime = to12Hour(stopTime);
-                
-                // Handle null Operation ID (represented as "-")
-                const operationID = tags === '-' ? '' : tags;
-                
-                return [project, operationID, member, newDate, newStartTime, newEndTime];
-            });
+            const rows = unquoted.slice(1)
+                .filter(row => {
+                    const project = row[0];
+                    return project.startsWith('PR');
+                })
+                .map(row => {
+                    let project, tags, member, startDate, stopDate, startTime, stopTime;
+                    
+                    if (hasEmail) {
+                        [project, tags, member, , startDate, stopDate, startTime, stopTime] = row;
+                    } else {
+                        [project, tags, member, startDate, stopDate, startTime, stopTime] = row;
+                    }
+                    
+                    // Transform date: YYYY-MM-DD → MM/DD/YYYY
+                    const [year, month, day] = startDate.split('-');
+                    const newDate = `${month}/${day}/${year}`;
+                    
+                    // Transform times: 24h HH:MM:SS → 12h H:MM AM/PM
+                    const newStartTime = to12Hour(startTime);
+                    const newEndTime = to12Hour(stopTime);
+                    
+                    // Handle null Operation ID (represented as "-")
+                    const operationID = tags === '-' ? '' : tags;
+                    
+                    return [project, operationID, member, newDate, newStartTime, newEndTime];
+                });
 
             // Build output with correct column order
             const output = [
