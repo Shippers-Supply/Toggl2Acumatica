@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Toggl → Acumatica Converter</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        #dropzone { border: 3px dashed #ccc; border-radius: 8px; padding: 60px 20px; text-align: center; background: #f9f9f9; cursor: pointer; transition: all 0.3s; }
+        #dropzone.dragover { border-color: #0078d4; background: #e3f2fd; }
+        #status { margin-top: 20px; padding: 12px; border-radius: 4px; display: none; }
+        #status.success { background: #d4edda; color: #155724; display: block; }
+        #status.error { background: #f8d7da; color: #721c24; display: block; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <h1>Toggl Time Entry Converter</h1>
+    <p>Drag your Toggl CSV file here or click to select:</p>
+    
+    <div id="dropzone">
+        <input type="file" id="fileInput" accept=".csv" class="hidden">
+        <p style="font-size: 18px; margin: 0;">📄 Drop CSV here or click to browse</p>
+    </div>
+    
+    <div id="status"></div>
+
+    <script>
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const status = document.getElementById('status');
+
+        dropzone.onclick = () => fileInput.click();
+        
+        dropzone.ondragover = (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        };
+        
+        dropzone.ondragleave = () => dropzone.classList.remove('dragover');
+        
+        dropzone.ondrop = (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            processFile(e.dataTransfer.files[0]);
+        };
+        
+        fileInput.onchange = (e) => processFile(e.target.files[0]);
+
+        function processFile(file) {
+            if (!file || !file.name.endsWith('.csv')) {
+                showStatus('Please select a CSV file', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const transformed = transformCSV(e.target.result);
+                    downloadCSV(transformed, file.name.replace('TogglTrack_', 'ACUMATICA_TOGGL_'));
+                    showStatus('✓ File converted and downloaded', 'success');
+                } catch (error) {
+                    showStatus('Error: ' + error.message, 'error');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function transformCSV(content) {
+            const lines = content.trim().split('\n');
+            
+            // Remove quotes from all cells
+            const unquoted = lines.map(line => 
+                line.split(',').map(cell => cell.replace(/^"|"$/g, ''))
+            );
+
+            // Validate header structure
+            const header = unquoted[0];
+            const expectedColumns = ['Project', 'Tags', 'Member', 'Email', 'Start date', 'Stop date', 'Start time', 'Stop time'];
+            const expectedColumnsNoEmail = ['Project', 'Tags', 'Member', 'Start date', 'Stop date', 'Start time', 'Stop time'];
+            
+            const hasEmail = header.length === 8;
+            const noEmail = header.length === 7;
+            
+            // Validate column structure
+            if (hasEmail) {
+                for (let i = 0; i < expectedColumns.length; i++) {
+                    if (header[i] !== expectedColumns[i]) {
+                        throw new Error(`Invalid CSV structure. Expected column ${i + 1} to be "${expectedColumns[i]}" but found "${header[i]}"`);
+                    }
+                }
+            } else if (noEmail) {
+                for (let i = 0; i < expectedColumnsNoEmail.length; i++) {
+                    if (header[i] !== expectedColumnsNoEmail[i]) {
+                        throw new Error(`Invalid CSV structure. Expected column ${i + 1} to be "${expectedColumnsNoEmail[i]}" but found "${header[i]}"`);
+                    }
+                }
+            } else {
+                throw new Error(`Invalid CSV structure. Expected 7 or 8 columns, found ${header.length}`);
+            }
+
+            // Process data rows
+            const rows = unquoted.slice(1).map(row => {
+                let project, tags, member, startDate, stopDate, startTime, stopTime;
+                
+                if (hasEmail) {
+                    [project, tags, member, , startDate, stopDate, startTime, stopTime] = row;
+                } else {
+                    [project, tags, member, startDate, stopDate, startTime, stopTime] = row;
+                }
+                
+                // Transform date: YYYY-MM-DD → MM/DD/YYYY
+                const [year, month, day] = startDate.split('-');
+                const newDate = `${month}/${day}/${year}`;
+                
+                // Transform times: 24h HH:MM:SS → 12h H:MM AM/PM
+                const newStartTime = to12Hour(startTime);
+                const newEndTime = to12Hour(stopTime);
+                
+                // Handle null Operation ID (represented as "-")
+                const operationID = tags === '-' ? '' : tags;
+                
+                return [project, operationID, member, newDate, newStartTime, newEndTime];
+            });
+
+            // Build output with correct column order
+            const output = [
+                ['Production Nbr.', 'Operation ID', 'Employee ID', 'Start date', 'Start Time', 'End Time'],
+                ...rows
+            ];
+
+            return output.map(row => row.join(',')).join('\n');
+        }
+
+        function to12Hour(time24) {
+            const [hours24, minutes, seconds] = time24.split(':');
+            let hours = parseInt(hours24);
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            
+            if (hours === 0) hours = 12;
+            else if (hours > 12) hours -= 12;
+            
+            return `${hours}:${minutes} ${ampm}`;
+        }
+
+        function downloadCSV(content, filename) {
+            const blob = new Blob([content], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = type;
+        }
+    </script>
+</body>
+</html>
